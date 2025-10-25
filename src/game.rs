@@ -188,4 +188,12 @@ impl Game {
     pub fn get_game_mode(&self) -> GameMode {
         self.game_mode
     }
+    
+    pub fn is_game_over(&self) -> bool {
+        self.game_over
+    }
+    
+    pub fn set_game_over(&mut self) {
+        self.game_over = true;
+    }
 }

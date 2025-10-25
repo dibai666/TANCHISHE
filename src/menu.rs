@@ -14,6 +14,7 @@ pub enum MenuState {
     ModeSelection,
     Playing,
     GameMenu,
+    GameOver,
 }
 
 pub struct Menu {
@@ -24,6 +25,7 @@ pub struct Menu {
     pub window_height: f64,
     pub is_paused: bool,
     pub should_restart: bool,
+    pub final_score: i32,
 }
 
 impl Menu {
@@ -36,6 +38,7 @@ impl Menu {
             window_height,
             is_paused: false,
             should_restart: false,
+            final_score: 0,
         }
     }
 
@@ -49,6 +52,10 @@ impl Menu {
     pub fn update_window_size(&mut self, new_width: f64, new_height: f64) {
         self.window_width = new_width;
         self.window_height = new_height;
+    }
+    
+    pub fn set_final_score(&mut self, score: i32) {
+        self.final_score = score;
     }
 
     pub fn handle_click(&mut self, x: f64, y: f64) {
@@ -144,6 +151,24 @@ impl Menu {
                     self.state = MenuState::Playing;
                 }
             }
+            MenuState::GameOver => {
+                let center_x = self.window_width / 2.0;
+                let center_y = self.window_height / 2.0;
+                
+                // 重新开始按钮 (y: center_y - 20 到 center_y + 20)
+                if x >= center_x - 100.0 && x <= center_x + 100.0 && 
+                   y >= center_y - 20.0 && y <= center_y + 20.0 {
+                    // 重新开始游戏
+                    self.is_paused = false;
+                    self.should_restart = true;
+                    self.state = MenuState::Playing;
+                }
+                // 返回主菜单按钮 (y: center_y + 40 到 center_y + 80)
+                else if x >= center_x - 100.0 && x <= center_x + 100.0 && 
+                        y >= center_y + 40.0 && y <= center_y + 80.0 {
+                    self.state = MenuState::Main;
+                }
+            }
         }
     }
 
@@ -169,6 +194,11 @@ impl Menu {
                     self.state = MenuState::Playing;
                 }
             }
+            MenuState::GameOver => {
+                if key == Key::Escape {
+                    self.state = MenuState::Main;
+                }
+            }
         }
     }
 
@@ -183,6 +213,10 @@ impl Menu {
             MenuState::GameMenu => {
                 // 绘制游戏内菜单
                 self.draw_game_menu(con, g);
+            }
+            MenuState::GameOver => {
+                // 绘制GameOver菜单
+                self.draw_game_over_menu(con, g);
             }
         }
     }
@@ -199,8 +233,10 @@ impl Menu {
             g,
         );
 
+        // 绘制标题阴影
+        self.draw_text("SNAKE GAME", center_x + 2.0, center_y - 118.0, 48.0, [0.0, 0.0, 0.0, 0.8], con, g);
         // 绘制标题
-        self.draw_text("SNAKE GAME", center_x, center_y - 120.0, 36.0, [1.0, 1.0, 1.0, 1.0], con, g);
+        self.draw_text("SNAKE GAME", center_x, center_y - 120.0, 48.0, [1.0, 1.0, 1.0, 1.0], con, g);
 
         // 绘制游戏开始按钮
         self.draw_button("START GAME", center_x, center_y - 20.0, 200.0, 50.0, [0.2, 0.6, 0.2, 1.0], con, g);
@@ -221,8 +257,10 @@ impl Menu {
             g,
         );
 
+        // 绘制标题阴影
+        self.draw_text("SELECT MODE", center_x + 2.0, center_y - 118.0, 40.0, [0.0, 0.0, 0.0, 0.8], con, g);
         // 绘制标题
-        self.draw_text("SELECT MODE", center_x, center_y - 120.0, 32.0, [1.0, 1.0, 1.0, 1.0], con, g);
+        self.draw_text("SELECT MODE", center_x, center_y - 120.0, 40.0, [1.0, 1.0, 1.0, 1.0], con, g);
 
         // 绘制模式按钮
         self.draw_button("CLASSIC", center_x, center_y - 40.0, 200.0, 50.0, [0.2, 0.4, 0.8, 1.0], con, g);
@@ -301,7 +339,7 @@ impl Menu {
     
     pub fn draw_score(&self, score: i32, con: &Context, g: &mut G2d) {
         let score_text = format!("SCORE: {}", score);
-        self.draw_text(&score_text, 100.0, 30.0, 20.0, [1.0, 1.0, 1.0, 1.0], con, g);
+        self.draw_text(&score_text, 100.0, 30.0, 24.0, [1.0, 1.0, 1.0, 1.0], con, g);
     }
     
     pub fn draw_pause_indicator(&self, con: &Context, g: &mut G2d) {
@@ -318,8 +356,8 @@ impl Menu {
             );
             
             // 绘制暂停文本
-            self.draw_text("PAUSED", center_x, center_y, 36.0, [1.0, 1.0, 0.0, 1.0], con, g);
-            self.draw_text("Press ESC to resume", center_x, center_y + 50.0, 18.0, [0.8, 0.8, 0.8, 1.0], con, g);
+            self.draw_text("PAUSED", center_x, center_y, 48.0, [1.0, 1.0, 0.0, 1.0], con, g);
+            self.draw_text("Press ESC to resume", center_x, center_y + 50.0, 22.0, [0.8, 0.8, 0.8, 1.0], con, g);
         }
     }
 
@@ -371,7 +409,7 @@ impl Menu {
         );
 
         // 绘制菜单标题
-        self.draw_text("GAME MENU", center_x, center_y - 80.0, 24.0, [1.0, 1.0, 1.0, 1.0], con, g);
+        self.draw_text("GAME MENU", center_x, center_y - 80.0, 32.0, [1.0, 1.0, 1.0, 1.0], con, g);
 
         // 绘制菜单按钮
         let pause_text = if self.is_paused { "RESUME" } else { "PAUSE" };
@@ -380,6 +418,67 @@ impl Menu {
         self.draw_button("RESTART", center_x, center_y + 20.0, 200.0, 40.0, [0.6, 0.4, 0.2, 1.0], con, g);
         self.draw_button("MAIN MENU", center_x, center_y + 70.0, 200.0, 40.0, [0.6, 0.2, 0.2, 1.0], con, g);
         self.draw_button("CLOSE", center_x, center_y + 120.0, 200.0, 40.0, [0.4, 0.4, 0.4, 1.0], con, g);
+    }
+
+    fn draw_game_over_menu(&self, con: &Context, g: &mut G2d) {
+        let center_x = self.window_width / 2.0;
+        let center_y = self.window_height / 2.0;
+
+        // 绘制半透明背景
+        rectangle(
+            [0.0, 0.0, 0.0, 0.8], // 半透明黑色背景
+            [0.0, 0.0, self.window_width, self.window_height],
+            con.transform,
+            g,
+        );
+
+        // 绘制菜单背景
+        rectangle(
+            [0.1, 0.1, 0.1, 0.95], // 深色背景
+            [center_x - 150.0, center_y - 100.0, 300.0, 200.0],
+            con.transform,
+            g,
+        );
+
+        // 绘制菜单边框
+        let border_width = 3.0;
+        rectangle(
+            [0.8, 0.0, 0.0, 1.0], // 红色边框
+            [center_x - 150.0, center_y - 100.0, border_width, 200.0],
+            con.transform,
+            g,
+        );
+        rectangle(
+            [0.8, 0.0, 0.0, 1.0],
+            [center_x + 147.0, center_y - 100.0, border_width, 200.0],
+            con.transform,
+            g,
+        );
+        rectangle(
+            [0.8, 0.0, 0.0, 1.0],
+            [center_x - 150.0, center_y - 100.0, 300.0, border_width],
+            con.transform,
+            g,
+        );
+        rectangle(
+            [0.8, 0.0, 0.0, 1.0],
+            [center_x - 150.0, center_y + 97.0, 300.0, border_width],
+            con.transform,
+            g,
+        );
+
+        // 绘制GameOver标题阴影
+        self.draw_text("GAME OVER", center_x + 2.0, center_y - 58.0, 36.0, [0.0, 0.0, 0.0, 0.8], con, g);
+        // 绘制GameOver标题
+        self.draw_text("GAME OVER", center_x, center_y - 60.0, 36.0, [1.0, 0.0, 0.0, 1.0], con, g);
+        
+        // 绘制最终分数
+        let score_text = format!("FINAL SCORE: {}", self.final_score);
+        self.draw_text(&score_text, center_x, center_y - 20.0, 24.0, [1.0, 1.0, 1.0, 1.0], con, g);
+
+        // 绘制菜单按钮
+        self.draw_button("PLAY AGAIN", center_x, center_y + 20.0, 200.0, 40.0, [0.2, 0.8, 0.2, 1.0], con, g);
+        self.draw_button("MAIN MENU", center_x, center_y + 70.0, 200.0, 40.0, [0.6, 0.2, 0.2, 1.0], con, g);
     }
 
     fn draw_button(&self, text: &str, x: f64, y: f64, width: f64, height: f64, color: [f32; 4], con: &Context, g: &mut G2d) {
@@ -418,8 +517,10 @@ impl Menu {
             g,
         );
 
-        // 绘制按钮文字
-        self.draw_text(text, x, y, 18.0, [1.0, 1.0, 1.0, 1.0], con, g);
+        // 绘制按钮文字阴影（稍微偏移的深色文字）
+        self.draw_text(text, x + 1.0, y + 1.0, 22.0, [0.0, 0.0, 0.0, 0.8], con, g);
+        // 绘制按钮文字主体
+        self.draw_text(text, x, y, 22.0, [1.0, 1.0, 1.0, 1.0], con, g);
     }
 
     fn draw_text(&self, text: &str, x: f64, y: f64, size: f64, color: [f32; 4], con: &Context, g: &mut G2d) {
@@ -428,366 +529,339 @@ impl Menu {
     }
 
     fn draw_english_text(&self, text: &str, x: f64, y: f64, size: f64, color: [f32; 4], con: &Context, g: &mut G2d) {
-        let char_width = size * 0.5;
+        let char_width = size * 0.6; // 增加字符宽度，让文字更清晰
         let char_height = size;
         let start_x = x - (text.len() as f64 * char_width) / 2.0;
         
         for (i, ch) in text.chars().enumerate() {
             let char_x = start_x + i as f64 * char_width;
-            self.draw_english_char(ch, char_x, y, char_width, char_height, color, con, g);
+            // 调整字符的垂直位置，让文字更好地居中
+            let char_y = y - char_height * 0.1;
+            self.draw_english_char(ch, char_x, char_y, char_width, char_height, color, con, g);
         }
     }
 
     fn draw_english_char(&self, ch: char, x: f64, y: f64, width: f64, height: f64, color: [f32; 4], con: &Context, g: &mut G2d) {
-        // 使用简单的点阵字体显示英文字符
-        let pixel_size = width / 5.0; // 5x7像素网格
+        // 使用简单的点阵字体显示英文字符，增加像素大小以提高清晰度
+        let pixel_size = width / 4.0; // 改为4x6像素网格，像素更大更清晰
         
         match ch {
             'S' => {
                 let pattern = [
-                    [0,1,1,1,0],
-                    [1,0,0,0,0],
-                    [0,1,1,1,0],
-                    [0,0,0,0,1],
-                    [1,1,1,1,0],
-                    [0,0,0,0,0],
-                    [0,0,0,0,0],
+                    [0,1,1,0],
+                    [1,0,0,0],
+                    [0,1,1,0],
+                    [0,0,0,1],
+                    [1,1,1,0],
+                    [0,0,0,0],
                 ];
                 self.draw_pattern(pattern, x, y, pixel_size, color, con, g);
             },
             'N' => {
                 let pattern = [
-                    [1,0,0,0,1],
-                    [1,1,0,0,1],
-                    [1,0,1,0,1],
-                    [1,0,0,1,1],
-                    [1,0,0,0,1],
-                    [0,0,0,0,0],
-                    [0,0,0,0,0],
+                    [1,0,0,1],
+                    [1,1,0,1],
+                    [1,0,1,1],
+                    [1,0,0,1],
+                    [1,0,0,1],
+                    [0,0,0,0],
                 ];
                 self.draw_pattern(pattern, x, y, pixel_size, color, con, g);
             },
             'A' => {
                 let pattern = [
-                    [0,1,1,1,0],
-                    [1,0,0,0,1],
-                    [1,1,1,1,1],
-                    [1,0,0,0,1],
-                    [1,0,0,0,1],
-                    [0,0,0,0,0],
-                    [0,0,0,0,0],
+                    [0,1,1,0],
+                    [1,0,0,1],
+                    [1,1,1,1],
+                    [1,0,0,1],
+                    [1,0,0,1],
+                    [0,0,0,0],
                 ];
                 self.draw_pattern(pattern, x, y, pixel_size, color, con, g);
             },
             'K' => {
                 let pattern = [
-                    [1,0,0,1,0],
-                    [1,0,1,0,0],
-                    [1,1,0,0,0],
-                    [1,0,1,0,0],
-                    [1,0,0,1,0],
-                    [0,0,0,0,0],
-                    [0,0,0,0,0],
+                    [1,0,0,1],
+                    [1,0,1,0],
+                    [1,1,0,0],
+                    [1,0,1,0],
+                    [1,0,0,1],
+                    [0,0,0,0],
                 ];
                 self.draw_pattern(pattern, x, y, pixel_size, color, con, g);
             },
             'E' => {
                 let pattern = [
-                    [1,1,1,1,1],
-                    [1,0,0,0,0],
-                    [1,1,1,1,0],
-                    [1,0,0,0,0],
-                    [1,1,1,1,1],
-                    [0,0,0,0,0],
-                    [0,0,0,0,0],
+                    [1,1,1,1],
+                    [1,0,0,0],
+                    [1,1,1,0],
+                    [1,0,0,0],
+                    [1,1,1,1],
+                    [0,0,0,0],
                 ];
                 self.draw_pattern(pattern, x, y, pixel_size, color, con, g);
             },
             'G' => {
                 let pattern = [
-                    [0,1,1,1,0],
-                    [1,0,0,0,0],
-                    [1,0,1,1,1],
-                    [1,0,0,0,1],
-                    [0,1,1,1,0],
-                    [0,0,0,0,0],
-                    [0,0,0,0,0],
+                    [0,1,1,0],
+                    [1,0,0,0],
+                    [1,0,1,1],
+                    [1,0,0,1],
+                    [0,1,1,0],
+                    [0,0,0,0],
                 ];
                 self.draw_pattern(pattern, x, y, pixel_size, color, con, g);
             },
             'M' => {
                 let pattern = [
-                    [1,0,0,0,1],
-                    [1,1,0,1,1],
-                    [1,0,1,0,1],
-                    [1,0,0,0,1],
-                    [1,0,0,0,1],
-                    [0,0,0,0,0],
-                    [0,0,0,0,0],
+                    [1,0,0,1],
+                    [1,1,1,1],
+                    [1,0,0,1],
+                    [1,0,0,1],
+                    [1,0,0,1],
+                    [0,0,0,0],
                 ];
                 self.draw_pattern(pattern, x, y, pixel_size, color, con, g);
             },
             'T' => {
                 let pattern = [
-                    [1,1,1,1,1],
-                    [0,0,1,0,0],
-                    [0,0,1,0,0],
-                    [0,0,1,0,0],
-                    [0,0,1,0,0],
-                    [0,0,0,0,0],
-                    [0,0,0,0,0],
+                    [1,1,1,1],
+                    [0,1,1,0],
+                    [0,1,1,0],
+                    [0,1,1,0],
+                    [0,1,1,0],
+                    [0,0,0,0],
                 ];
                 self.draw_pattern(pattern, x, y, pixel_size, color, con, g);
             },
             'R' => {
                 let pattern = [
-                    [1,1,1,1,0],
-                    [1,0,0,0,1],
-                    [1,1,1,1,0],
-                    [1,0,1,0,0],
-                    [1,0,0,1,0],
-                    [0,0,0,0,0],
-                    [0,0,0,0,0],
+                    [1,1,1,0],
+                    [1,0,0,1],
+                    [1,1,1,0],
+                    [1,0,1,0],
+                    [1,0,0,1],
+                    [0,0,0,0],
                 ];
                 self.draw_pattern(pattern, x, y, pixel_size, color, con, g);
             },
             'I' => {
                 let pattern = [
-                    [1,1,1,1,1],
-                    [0,0,1,0,0],
-                    [0,0,1,0,0],
-                    [0,0,1,0,0],
-                    [1,1,1,1,1],
-                    [0,0,0,0,0],
-                    [0,0,0,0,0],
+                    [1,1,1,1],
+                    [0,1,1,0],
+                    [0,1,1,0],
+                    [0,1,1,0],
+                    [1,1,1,1],
+                    [0,0,0,0],
                 ];
                 self.draw_pattern(pattern, x, y, pixel_size, color, con, g);
             },
             'X' => {
                 let pattern = [
-                    [1,0,0,0,1],
-                    [0,1,0,1,0],
-                    [0,0,1,0,0],
-                    [0,1,0,1,0],
-                    [1,0,0,0,1],
-                    [0,0,0,0,0],
-                    [0,0,0,0,0],
+                    [1,0,0,1],
+                    [0,1,1,0],
+                    [0,0,1,0],
+                    [0,1,1,0],
+                    [1,0,0,1],
+                    [0,0,0,0],
                 ];
                 self.draw_pattern(pattern, x, y, pixel_size, color, con, g);
             },
             'C' => {
                 let pattern = [
-                    [0,1,1,1,0],
-                    [1,0,0,0,0],
-                    [1,0,0,0,0],
-                    [1,0,0,0,0],
-                    [0,1,1,1,0],
-                    [0,0,0,0,0],
-                    [0,0,0,0,0],
+                    [0,1,1,0],
+                    [1,0,0,0],
+                    [1,0,0,0],
+                    [1,0,0,0],
+                    [0,1,1,0],
+                    [0,0,0,0],
                 ];
                 self.draw_pattern(pattern, x, y, pixel_size, color, con, g);
             },
             'L' => {
                 let pattern = [
-                    [1,0,0,0,0],
-                    [1,0,0,0,0],
-                    [1,0,0,0,0],
-                    [1,0,0,0,0],
-                    [1,1,1,1,1],
-                    [0,0,0,0,0],
-                    [0,0,0,0,0],
+                    [1,0,0,0],
+                    [1,0,0,0],
+                    [1,0,0,0],
+                    [1,0,0,0],
+                    [1,1,1,1],
+                    [0,0,0,0],
                 ];
                 self.draw_pattern(pattern, x, y, pixel_size, color, con, g);
             },
             'D' => {
                 let pattern = [
-                    [1,1,1,1,0],
-                    [1,0,0,0,1],
-                    [1,0,0,0,1],
-                    [1,0,0,0,1],
-                    [1,1,1,1,0],
-                    [0,0,0,0,0],
-                    [0,0,0,0,0],
+                    [1,1,1,0],
+                    [1,0,0,1],
+                    [1,0,0,1],
+                    [1,0,0,1],
+                    [1,1,1,0],
+                    [0,0,0,0],
                 ];
                 self.draw_pattern(pattern, x, y, pixel_size, color, con, g);
             },
             'P' => {
                 let pattern = [
-                    [1,1,1,1,0],
-                    [1,0,0,0,1],
-                    [1,1,1,1,0],
-                    [1,0,0,0,0],
-                    [1,0,0,0,0],
-                    [0,0,0,0,0],
-                    [0,0,0,0,0],
+                    [1,1,1,0],
+                    [1,0,0,1],
+                    [1,1,1,0],
+                    [1,0,0,0],
+                    [1,0,0,0],
+                    [0,0,0,0],
                 ];
                 self.draw_pattern(pattern, x, y, pixel_size, color, con, g);
             },
             'U' => {
                 let pattern = [
-                    [1,0,0,0,1],
-                    [1,0,0,0,1],
-                    [1,0,0,0,1],
-                    [1,0,0,0,1],
-                    [0,1,1,1,0],
-                    [0,0,0,0,0],
-                    [0,0,0,0,0],
+                    [1,0,0,1],
+                    [1,0,0,1],
+                    [1,0,0,1],
+                    [1,0,0,1],
+                    [0,1,1,0],
+                    [0,0,0,0],
                 ];
                 self.draw_pattern(pattern, x, y, pixel_size, color, con, g);
             },
             'V' => {
                 let pattern = [
-                    [1,0,0,0,1],
-                    [1,0,0,0,1],
-                    [0,1,0,1,0],
-                    [0,1,0,1,0],
-                    [0,0,1,0,0],
-                    [0,0,0,0,0],
-                    [0,0,0,0,0],
+                    [1,0,0,1],
+                    [1,0,0,1],
+                    [0,1,1,0],
+                    [0,1,1,0],
+                    [0,0,1,0],
+                    [0,0,0,0],
                 ];
                 self.draw_pattern(pattern, x, y, pixel_size, color, con, g);
             },
             'B' => {
                 let pattern = [
-                    [1,1,1,1,0],
-                    [1,0,0,0,1],
-                    [1,1,1,1,0],
-                    [1,0,0,0,1],
-                    [1,1,1,1,0],
-                    [0,0,0,0,0],
-                    [0,0,0,0,0],
+                    [1,1,1,0],
+                    [1,0,0,1],
+                    [1,1,1,0],
+                    [1,0,0,1],
+                    [1,1,1,0],
+                    [0,0,0,0],
                 ];
                 self.draw_pattern(pattern, x, y, pixel_size, color, con, g);
             },
             '0' => {
                 let pattern = [
-                    [0,1,1,1,0],
-                    [1,0,0,0,1],
-                    [1,0,0,0,1],
-                    [1,0,0,0,1],
-                    [0,1,1,1,0],
-                    [0,0,0,0,0],
-                    [0,0,0,0,0],
+                    [0,1,1,0],
+                    [1,0,0,1],
+                    [1,0,0,1],
+                    [1,0,0,1],
+                    [0,1,1,0],
+                    [0,0,0,0],
                 ];
                 self.draw_pattern(pattern, x, y, pixel_size, color, con, g);
             },
             '1' => {
                 let pattern = [
-                    [0,0,1,0,0],
-                    [0,1,1,0,0],
-                    [0,0,1,0,0],
-                    [0,0,1,0,0],
-                    [0,1,1,1,0],
-                    [0,0,0,0,0],
-                    [0,0,0,0,0],
+                    [0,1,0,0],
+                    [1,1,0,0],
+                    [0,1,0,0],
+                    [0,1,0,0],
+                    [1,1,1,0],
+                    [0,0,0,0],
                 ];
                 self.draw_pattern(pattern, x, y, pixel_size, color, con, g);
             },
             '2' => {
                 let pattern = [
-                    [0,1,1,1,0],
-                    [0,0,0,0,1],
-                    [0,1,1,1,0],
-                    [1,0,0,0,0],
-                    [1,1,1,1,1],
-                    [0,0,0,0,0],
-                    [0,0,0,0,0],
+                    [0,1,1,0],
+                    [0,0,0,1],
+                    [0,1,1,0],
+                    [1,0,0,0],
+                    [1,1,1,1],
+                    [0,0,0,0],
                 ];
                 self.draw_pattern(pattern, x, y, pixel_size, color, con, g);
             },
             '3' => {
                 let pattern = [
-                    [0,1,1,1,0],
-                    [0,0,0,0,1],
-                    [0,1,1,1,0],
-                    [0,0,0,0,1],
-                    [0,1,1,1,0],
-                    [0,0,0,0,0],
-                    [0,0,0,0,0],
+                    [0,1,1,0],
+                    [0,0,0,1],
+                    [0,1,1,0],
+                    [0,0,0,1],
+                    [0,1,1,0],
+                    [0,0,0,0],
                 ];
                 self.draw_pattern(pattern, x, y, pixel_size, color, con, g);
             },
             '4' => {
                 let pattern = [
-                    [1,0,0,1,0],
-                    [1,0,0,1,0],
-                    [1,1,1,1,1],
-                    [0,0,0,1,0],
-                    [0,0,0,1,0],
-                    [0,0,0,0,0],
-                    [0,0,0,0,0],
+                    [1,0,1,0],
+                    [1,0,1,0],
+                    [1,1,1,1],
+                    [0,0,1,0],
+                    [0,0,1,0],
+                    [0,0,0,0],
                 ];
                 self.draw_pattern(pattern, x, y, pixel_size, color, con, g);
             },
             '5' => {
                 let pattern = [
-                    [1,1,1,1,1],
-                    [1,0,0,0,0],
-                    [1,1,1,1,0],
-                    [0,0,0,0,1],
-                    [1,1,1,1,0],
-                    [0,0,0,0,0],
-                    [0,0,0,0,0],
+                    [1,1,1,1],
+                    [1,0,0,0],
+                    [1,1,1,0],
+                    [0,0,0,1],
+                    [1,1,1,0],
+                    [0,0,0,0],
                 ];
                 self.draw_pattern(pattern, x, y, pixel_size, color, con, g);
             },
             '6' => {
                 let pattern = [
-                    [0,1,1,1,0],
-                    [1,0,0,0,0],
-                    [1,1,1,1,0],
-                    [1,0,0,0,1],
-                    [0,1,1,1,0],
-                    [0,0,0,0,0],
-                    [0,0,0,0,0],
+                    [0,1,1,0],
+                    [1,0,0,0],
+                    [1,1,1,0],
+                    [1,0,0,1],
+                    [0,1,1,0],
+                    [0,0,0,0],
                 ];
                 self.draw_pattern(pattern, x, y, pixel_size, color, con, g);
             },
             '7' => {
                 let pattern = [
-                    [1,1,1,1,1],
-                    [0,0,0,0,1],
-                    [0,0,0,1,0],
-                    [0,0,1,0,0],
-                    [0,1,0,0,0],
-                    [0,0,0,0,0],
-                    [0,0,0,0,0],
+                    [1,1,1,1],
+                    [0,0,0,1],
+                    [0,0,1,0],
+                    [0,1,0,0],
+                    [1,0,0,0],
+                    [0,0,0,0],
                 ];
                 self.draw_pattern(pattern, x, y, pixel_size, color, con, g);
             },
             '8' => {
                 let pattern = [
-                    [0,1,1,1,0],
-                    [1,0,0,0,1],
-                    [0,1,1,1,0],
-                    [1,0,0,0,1],
-                    [0,1,1,1,0],
-                    [0,0,0,0,0],
-                    [0,0,0,0,0],
+                    [0,1,1,0],
+                    [1,0,0,1],
+                    [0,1,1,0],
+                    [1,0,0,1],
+                    [0,1,1,0],
+                    [0,0,0,0],
                 ];
                 self.draw_pattern(pattern, x, y, pixel_size, color, con, g);
             },
             '9' => {
                 let pattern = [
-                    [0,1,1,1,0],
-                    [1,0,0,0,1],
-                    [0,1,1,1,1],
-                    [0,0,0,0,1],
-                    [0,1,1,1,0],
-                    [0,0,0,0,0],
-                    [0,0,0,0,0],
+                    [0,1,1,0],
+                    [1,0,0,1],
+                    [0,1,1,1],
+                    [0,0,0,1],
+                    [0,1,1,0],
+                    [0,0,0,0],
                 ];
                 self.draw_pattern(pattern, x, y, pixel_size, color, con, g);
             },
             ':' => {
                 let pattern = [
-                    [0,0,0,0,0],
-                    [0,0,1,0,0],
-                    [0,0,0,0,0],
-                    [0,0,1,0,0],
-                    [0,0,0,0,0],
-                    [0,0,0,0,0],
-                    [0,0,0,0,0],
+                    [0,0,0,0],
+                    [0,1,1,0],
+                    [0,0,0,0],
+                    [0,1,1,0],
+                    [0,0,0,0],
+                    [0,0,0,0],
                 ];
                 self.draw_pattern(pattern, x, y, pixel_size, color, con, g);
             },
@@ -806,15 +880,17 @@ impl Menu {
         }
     }
 
-    fn draw_pattern(&self, pattern: [[u8; 5]; 7], x: f64, y: f64, pixel_size: f64, color: [f32; 4], con: &Context, g: &mut G2d) {
+    fn draw_pattern(&self, pattern: [[u8; 4]; 6], x: f64, y: f64, pixel_size: f64, color: [f32; 4], con: &Context, g: &mut G2d) {
         for (row, row_data) in pattern.iter().enumerate() {
             for (col, &pixel) in row_data.iter().enumerate() {
                 if pixel == 1 {
                     let pixel_x = x + col as f64 * pixel_size;
-                    let pixel_y = y - 3.0 * pixel_size + row as f64 * pixel_size;
+                    let pixel_y = y - 2.5 * pixel_size + row as f64 * pixel_size;
+                    // 增加像素大小，让文字更清晰
+                    let pixel_size_with_padding = pixel_size * 1.1;
                     rectangle(
                         color,
-                        [pixel_x, pixel_y, pixel_size, pixel_size],
+                        [pixel_x - 0.05 * pixel_size, pixel_y - 0.05 * pixel_size, pixel_size_with_padding, pixel_size_with_padding],
                         con.transform,
                         g,
                     );

@@ -97,6 +97,12 @@ fn main() {
                     }
                     menu.draw(&c, g); // 绘制游戏内菜单
                 }
+                MenuState::GameOver => {
+                    if let Some(ref game) = game {
+                        game.draw(&c, g);
+                    }
+                    menu.draw(&c, g); // 绘制GameOver菜单
+                }
             }
         });
         
@@ -104,6 +110,11 @@ fn main() {
             if menu.state == MenuState::Playing && !menu.is_paused {
                 if let Some(ref mut game) = game {
                     game.update(arg.dt);
+                    // 检查游戏是否结束
+                    if game.is_game_over() {
+                        menu.set_final_score(game.get_score());
+                        menu.state = MenuState::GameOver;
+                    }
                 }
             }
         });
