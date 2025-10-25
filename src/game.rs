@@ -3,6 +3,7 @@ use piston_window::types::Color;
 use piston_window::*;
 use rand::{thread_rng, Rng};
 use crate::snake::{Direction, Snake};
+use crate::menu::GameMode;
 const FOOD_COLOR: Color = [0.80, 0.00, 0.00, 1.0];
 const BORDER_COLOR: Color = [0.80, 0.00, 0.00, 1.0];
 const GAMEOVER_COLOR: Color = [0.90, 0.00, 0.00, 0.5];
@@ -23,11 +24,23 @@ pub struct Game {
     block_size: f64,
     offset_x: f64,
     offset_y: f64,
+    game_mode: GameMode,
+    score: i32,
+    speed_multiplier: f64,
 }
 impl Game {
     pub fn new(width: i32, height: i32) -> Game {
+        Self::new_with_mode(width, height, GameMode::Classic)
+    }
+    
+    pub fn new_with_mode(width: i32, height: i32, mode: GameMode) -> Game {
         let initial_window_width = (width * 25) as f64; // 25 is BLOCK_SIZE
         let initial_window_height = (height * 25) as f64;
+        let speed_multiplier = match mode {
+            GameMode::Classic => 1.0,
+            GameMode::Speed => 1.5,
+            GameMode::Survival => 0.8,
+        };
         Game {
             snake: Snake::new(2, 2),
             food_exists: true,
@@ -42,6 +55,9 @@ impl Game {
             block_size: 25.0,
             offset_x: 0.0,
             offset_y: 0.0,
+            game_mode: mode,
+            score: 0,
+            speed_multiplier,
         }
     }
     
@@ -101,7 +117,10 @@ impl Game {
         if !self.food_exists {
             self.add_food();
         }
-        if self.waiting_time > MOVING_PERIOD {
+        
+        // 根据游戏模式调整移动速度
+        let moving_period = MOVING_PERIOD / self.speed_multiplier;
+        if self.waiting_time > moving_period {
             self.update_snake(None);
         }
     }
@@ -110,6 +129,12 @@ impl Game {
         if self.food_exists && self.food_x == head_x && self.food_y == head_y {
             self.food_exists = false;
             self.snake.restore_tail();
+            self.score += 1;
+            
+            // 在速度模式下，随着分数增加，速度也会增加
+            if self.game_mode == GameMode::Speed {
+                self.speed_multiplier = 1.5 + (self.score as f64 * 0.1);
+            }
         }
     }
     fn check_if_snake_alive(&self, dir: Option<Direction>) -> bool {
@@ -147,5 +172,20 @@ impl Game {
         self.food_x = 6;
         self.food_y = 4;
         self.game_over = false;
+        self.score = 0;
+        // 重置速度倍数
+        self.speed_multiplier = match self.game_mode {
+            GameMode::Classic => 1.0,
+            GameMode::Speed => 1.5,
+            GameMode::Survival => 0.8,
+        };
+    }
+    
+    pub fn get_score(&self) -> i32 {
+        self.score
+    }
+    
+    pub fn get_game_mode(&self) -> GameMode {
+        self.game_mode
     }
 }
