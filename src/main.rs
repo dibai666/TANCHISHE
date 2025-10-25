@@ -23,6 +23,7 @@ fn main() {
     
     let mut menu = Menu::new(800.0, 600.0);
     let mut game: Option<Game> = None;
+    let mut cursor_pos = [0.0, 0.0];
     
     // 尝试加载字体
     if let Err(e) = menu.load_font() {
@@ -30,19 +31,27 @@ fn main() {
     }
     
     while let Some(event) = window.next() {
+        // 更新光标位置
+        if let Some(pos) = event.mouse_cursor_args() {
+            cursor_pos = pos;
+        }
+        
         // 处理鼠标点击事件
         if let Some(Button::Mouse(MouseButton::Left)) = event.press_args() {
-            if let Some([x, y]) = event.mouse_cursor_args() {
-                menu.handle_click(x, y);
-            } else {
-                // 使用默认位置进行测试
-                menu.handle_click(400.0, 300.0);
-            }
+            println!("Mouse button pressed!");
+            println!("Mouse click detected at: ({}, {})", cursor_pos[0], cursor_pos[1]);
+            menu.handle_click(cursor_pos[0], cursor_pos[1]);
         }
         
         // 检查是否需要创建游戏实例
         if menu.state == MenuState::Playing && game.is_none() {
             game = Some(Game::new_with_mode(GAME_WIDTH, GAME_HEIGHT, menu.selected_mode));
+        }
+        
+        // 检查是否需要重新开始游戏
+        if menu.should_restart {
+            game = Some(Game::new_with_mode(GAME_WIDTH, GAME_HEIGHT, menu.selected_mode));
+            menu.should_restart = false;
         }
         
         // 处理键盘事件
@@ -75,13 +84,24 @@ fn main() {
                 MenuState::Playing => {
                     if let Some(ref game) = game {
                         game.draw(&c, g);
+                        // 绘制分数
+                        menu.draw_score(game.get_score(), &c, g);
+                        // 绘制暂停指示器
+                        menu.draw_pause_indicator(&c, g);
                     }
+                    menu.draw(&c, g); // 绘制游戏内菜单按钮
+                }
+                MenuState::GameMenu => {
+                    if let Some(ref game) = game {
+                        game.draw(&c, g);
+                    }
+                    menu.draw(&c, g); // 绘制游戏内菜单
                 }
             }
         });
         
         event.update(|arg| {
-            if menu.state == MenuState::Playing {
+            if menu.state == MenuState::Playing && !menu.is_paused {
                 if let Some(ref mut game) = game {
                     game.update(arg.dt);
                 }
