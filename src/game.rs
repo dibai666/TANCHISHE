@@ -83,9 +83,13 @@ impl Game {
         }
         let dir = match key {
             Key::Up => Some(Direction::Up),
+            Key::W => Some(Direction::Up),
             Key::Down => Some(Direction::Down),
+            Key::S => Some(Direction::Down),
             Key::Left => Some(Direction::Left),
+            Key::A => Some(Direction::Left),
             Key::Right => Some(Direction::Right),
+            Key::D => Some(Direction::Right),
             _ => None,
         };
         if dir.unwrap() == self.snake.head_direction().opposite() {
