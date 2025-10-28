@@ -2,6 +2,13 @@ use piston_window::*;
 use std::path::Path;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+pub enum GameSpeed {
+    Slow,
+    Medium,
+    Fast,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum GameMode {
     Classic,
     Speed,
@@ -12,6 +19,8 @@ pub enum GameMode {
 pub enum MenuState {
     Main,
     ModeSelection,
+    SpeedSelection,
+    ConfirmStart,
     Playing,
     GameMenu,
     GameOver,
@@ -20,6 +29,7 @@ pub enum MenuState {
 pub struct Menu {
     pub state: MenuState,
     pub selected_mode: GameMode,
+    pub selected_speed: GameSpeed,
     pub font: Option<rusttype::Font<'static>>,
     pub window_width: f64,
     pub window_height: f64,
@@ -33,6 +43,7 @@ impl Menu {
         Menu {
             state: MenuState::Main,
             selected_mode: GameMode::Classic,
+            selected_speed: GameSpeed::Medium,
             font: None,
             window_width,
             window_height,
@@ -99,7 +110,7 @@ impl Menu {
                 else if x >= center_x - 100.0 && x <= center_x + 100.0 && 
                         y >= center_y - 5.0 && y <= center_y + 45.0 {
                     self.selected_mode = GameMode::Speed;
-                    self.state = MenuState::Playing;
+                    self.state = MenuState::SpeedSelection;
                 }
                 // 生存模式按钮
                 else if x >= center_x - 100.0 && x <= center_x + 100.0 && 
@@ -111,6 +122,47 @@ impl Menu {
                 else if x >= center_x - 100.0 && x <= center_x + 100.0 && 
                         y >= center_y + 115.0 && y <= center_y + 165.0 {
                     self.state = MenuState::Main;
+                }
+            }
+            MenuState::SpeedSelection => {
+                let center_x = self.window_width / 2.0;
+                let center_y = self.window_height / 2.0;
+                // 慢速
+                if x >= center_x - 180.0 && x <= center_x - 60.0 &&
+                   y >= center_y - 20.0 && y <= center_y + 20.0 {
+                    self.selected_speed = GameSpeed::Slow;
+                    self.state = MenuState::ConfirmStart;
+                }
+                // 中速
+                else if x >= center_x - 40.0 && x <= center_x + 40.0 &&
+                        y >= center_y - 20.0 && y <= center_y + 20.0 {
+                    self.selected_speed = GameSpeed::Medium;
+                    self.state = MenuState::ConfirmStart;
+                }
+                // 快速
+                else if x >= center_x + 60.0 && x <= center_x + 180.0 &&
+                        y >= center_y - 20.0 && y <= center_y + 20.0 {
+                    self.selected_speed = GameSpeed::Fast;
+                    self.state = MenuState::ConfirmStart;
+                }
+                // 返回
+                else if x >= center_x - 100.0 && x <= center_x + 100.0 &&
+                        y >= center_y + 60.0 && y <= center_y + 100.0 {
+                    self.state = MenuState::ModeSelection;
+                }
+            }
+            MenuState::ConfirmStart => {
+                let center_x = self.window_width / 2.0;
+                let center_y = self.window_height / 2.0;
+                // YES
+                if x >= center_x - 90.0 && x <= center_x - 10.0 &&
+                   y >= center_y + 20.0 && y <= center_y + 60.0 {
+                    self.state = MenuState::Playing;
+                }
+                // NO
+                else if x >= center_x + 10.0 && x <= center_x + 90.0 &&
+                        y >= center_y + 20.0 && y <= center_y + 60.0 {
+                    self.state = MenuState::SpeedSelection;
                 }
             }
             MenuState::Playing => {
@@ -184,6 +236,16 @@ impl Menu {
                     self.state = MenuState::Main;
                 }
             }
+            MenuState::SpeedSelection => {
+                if key == Key::Escape {
+                    self.state = MenuState::ModeSelection;
+                }
+            }
+            MenuState::ConfirmStart => {
+                if key == Key::Escape {
+                    self.state = MenuState::SpeedSelection;
+                }
+            }
             MenuState::Playing => {
                 if key == Key::Escape {
                     self.state = MenuState::GameMenu;
@@ -206,6 +268,8 @@ impl Menu {
         match self.state {
             MenuState::Main => self.draw_main_menu(con, g),
             MenuState::ModeSelection => self.draw_mode_selection(con, g),
+            MenuState::SpeedSelection => self.draw_speed_selection(con, g),
+            MenuState::ConfirmStart => self.draw_confirm_start(con, g),
             MenuState::Playing => {
                 // 游戏进行中，绘制菜单按钮
                 self.draw_game_menu_button(con, g);
@@ -266,7 +330,64 @@ impl Menu {
         self.draw_button("CLASSIC", center_x, center_y - 40.0, 200.0, 50.0, [0.2, 0.4, 0.8, 1.0], con, g);
         self.draw_button("SPEED", center_x, center_y + 20.0, 200.0, 50.0, [0.8, 0.4, 0.2, 1.0], con, g);
         self.draw_button("SURVIVAL", center_x, center_y + 80.0, 200.0, 50.0, [0.8, 0.2, 0.8, 1.0], con, g);
+        // 返回按钮
         self.draw_button("BACK", center_x, center_y + 140.0, 200.0, 50.0, [0.4, 0.4, 0.4, 1.0], con, g);
+    }
+
+    fn draw_speed_selection(&self, con: &Context, g: &mut G2d) {
+        let center_x = self.window_width / 2.0;
+        let center_y = self.window_height / 2.0;
+
+        // 背景
+        rectangle(
+            [0.1, 0.1, 0.1, 1.0],
+            [0.0, 0.0, self.window_width, self.window_height],
+            con.transform,
+            g,
+        );
+
+        self.draw_text("SELECT SPEED", center_x, center_y - 80.0, 36.0, [1.0, 1.0, 1.0, 1.0], con, g);
+
+        let slow_color = if self.selected_speed == GameSpeed::Slow { [0.2, 0.8, 0.2, 1.0] } else { [0.2, 0.6, 0.2, 1.0] };
+        let medium_color = if self.selected_speed == GameSpeed::Medium { [0.2, 0.8, 0.2, 1.0] } else { [0.2, 0.6, 0.2, 1.0] };
+        let fast_color = if self.selected_speed == GameSpeed::Fast { [0.2, 0.8, 0.2, 1.0] } else { [0.2, 0.6, 0.2, 1.0] };
+        self.draw_button("SLOW", center_x - 120.0, center_y, 120.0, 40.0, slow_color, con, g);
+        self.draw_button("MEDIUM", center_x, center_y, 120.0, 40.0, medium_color, con, g);
+        self.draw_button("FAST", center_x + 120.0, center_y, 120.0, 40.0, fast_color, con, g);
+
+        self.draw_button("BACK", center_x, center_y + 100.0, 200.0, 40.0, [0.4, 0.4, 0.4, 1.0], con, g);
+    }
+
+    fn draw_confirm_start(&self, con: &Context, g: &mut G2d) {
+        let center_x = self.window_width / 2.0;
+        let center_y = self.window_height / 2.0;
+
+        // 半透明遮罩
+        rectangle(
+            [0.0, 0.0, 0.0, 0.7],
+            [0.0, 0.0, self.window_width, self.window_height],
+            con.transform,
+            g,
+        );
+
+        // 对话框
+        rectangle(
+            [0.15, 0.15, 0.15, 1.0],
+            [center_x - 160.0, center_y - 80.0, 320.0, 160.0],
+            con.transform,
+            g,
+        );
+
+        self.draw_text("Start with:", center_x, center_y - 40.0, 24.0, [1.0, 1.0, 1.0, 1.0], con, g);
+        let speed_text = match self.selected_speed {
+            GameSpeed::Slow => "SLOW",
+            GameSpeed::Medium => "MEDIUM",
+            GameSpeed::Fast => "FAST",
+        };
+        self.draw_text(speed_text, center_x, center_y - 10.0, 28.0, [1.0, 1.0, 0.0, 1.0], con, g);
+
+        self.draw_button("YES", center_x - 50.0, center_y + 40.0, 80.0, 40.0, [0.2, 0.8, 0.2, 1.0], con, g);
+        self.draw_button("NO", center_x + 50.0, center_y + 40.0, 80.0, 40.0, [0.8, 0.2, 0.2, 1.0], con, g);
     }
 
     fn draw_game_menu_button(&self, con: &Context, g: &mut G2d) {

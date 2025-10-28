@@ -3,7 +3,7 @@ use piston_window::types::Color;
 use piston_window::*;
 use rand::{thread_rng, Rng};
 use crate::snake::{Direction, Snake};
-use crate::menu::GameMode;
+use crate::menu::{GameMode, GameSpeed};
 const FOOD_COLOR: Color = [0.80, 0.00, 0.00, 1.0];
 const BORDER_COLOR: Color = [0.80, 0.00, 0.00, 1.0];
 const GAMEOVER_COLOR: Color = [0.90, 0.00, 0.00, 0.5];
@@ -27,13 +27,14 @@ pub struct Game {
     game_mode: GameMode,
     score: i32,
     speed_multiplier: f64,
+    speed_setting: GameSpeed,
 }
 impl Game {
     pub fn new(width: i32, height: i32) -> Game {
-        Self::new_with_mode(width, height, GameMode::Classic)
+        Self::new_with_mode(width, height, GameMode::Classic, GameSpeed::Medium)
     }
     
-    pub fn new_with_mode(width: i32, height: i32, mode: GameMode) -> Game {
+    pub fn new_with_mode(width: i32, height: i32, mode: GameMode, speed: GameSpeed) -> Game {
         let initial_window_width = (width * 25) as f64; // 25 is BLOCK_SIZE
         let initial_window_height = (height * 25) as f64;
         let speed_multiplier = match mode {
@@ -58,6 +59,7 @@ impl Game {
             game_mode: mode,
             score: 0,
             speed_multiplier,
+            speed_setting: speed,
         }
     }
     
@@ -122,8 +124,13 @@ impl Game {
             self.add_food();
         }
         
-        // 根据游戏模式调整移动速度
-        let moving_period = MOVING_PERIOD / self.speed_multiplier;
+        // 根据游戏模式与选择的速度调整移动速度
+        let speed_setting_multiplier = match self.speed_setting {
+            GameSpeed::Slow => 0.7,    // 慢速
+            GameSpeed::Medium => 1.0,  // 中速
+            GameSpeed::Fast => 1.5,    // 快速
+        };
+        let moving_period = MOVING_PERIOD / (self.speed_multiplier * speed_setting_multiplier);
         if self.waiting_time > moving_period {
             self.update_snake(None);
         }

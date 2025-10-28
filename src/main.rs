@@ -45,12 +45,12 @@ fn main() {
         
         // 检查是否需要创建游戏实例
         if menu.state == MenuState::Playing && game.is_none() {
-            game = Some(Game::new_with_mode(GAME_WIDTH, GAME_HEIGHT, menu.selected_mode));
+            game = Some(Game::new_with_mode(GAME_WIDTH, GAME_HEIGHT, menu.selected_mode, menu.selected_speed));
         }
         
         // 检查是否需要重新开始游戏
         if menu.should_restart {
-            game = Some(Game::new_with_mode(GAME_WIDTH, GAME_HEIGHT, menu.selected_mode));
+            game = Some(Game::new_with_mode(GAME_WIDTH, GAME_HEIGHT, menu.selected_mode, menu.selected_speed));
             menu.should_restart = false;
         }
         
@@ -78,7 +78,7 @@ fn main() {
             clear(BACK_COLOR, g);
             
             match menu.state {
-                MenuState::Main | MenuState::ModeSelection => {
+                MenuState::Main | MenuState::ModeSelection | MenuState::SpeedSelection | MenuState::ConfirmStart => {
                     menu.draw(&c, g);
                 }
                 MenuState::Playing => {
