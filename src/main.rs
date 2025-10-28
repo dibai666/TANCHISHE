@@ -8,6 +8,7 @@ use game::Game;
 use menu::{Menu, MenuState};
 use piston_window::types::Color;
 use piston_window::*;
+use piston_window::{Glyphs, TextureSettings};
 const BACK_COLOR: Color = [0.5, 0.5, 0.5, 1.0];
 const GAME_WIDTH: i32 = 30;
 const GAME_HEIGHT: i32 = 30;
@@ -22,6 +23,12 @@ fn main() {
             .unwrap();
     
     let mut menu = Menu::new(800.0, 600.0);
+    // 加载字体：优先根目录，其次 assets/
+    let mut glyphs = if std::path::Path::new("FiraSans-Regular.ttf").exists() {
+        Glyphs::new("FiraSans-Regular.ttf", window.create_texture_context(), TextureSettings::new()).unwrap()
+    } else {
+        Glyphs::new("assets/FiraSans-Regular.ttf", window.create_texture_context(), TextureSettings::new()).unwrap()
+    };
     let mut game: Option<Game> = None;
     let mut cursor_pos = [0.0, 0.0];
     
@@ -74,36 +81,47 @@ fn main() {
             }
         }
         
-        window.draw_2d(&event, |c, g, _| {
+        window.draw_2d(&event, |c, g, device| {
             clear(BACK_COLOR, g);
             
             match menu.state {
                 MenuState::Main | MenuState::ModeSelection | MenuState::SpeedSelection | MenuState::ConfirmStart => {
-                    menu.draw(&c, g);
+                    menu.draw(&c, g, &mut glyphs);
                 }
                 MenuState::Playing => {
                     if let Some(ref game) = game {
                         game.draw(&c, g);
                         // 绘制分数
-                        menu.draw_score(game.get_score(), &c, g);
+                        menu.draw_score(game.get_score(), &c, g, &mut glyphs);
+                        // 限时模式：绘制倒计时
+                        if let Some(rt) = game.get_remaining_time() {
+                            let min = (rt as i32) / 60;
+                            let s = (rt as i32) % 60;
+                            let time_text = format!("TIME {:02}:{:02}", min, s);
+                            menu.draw_text_top_right(&time_text, 24.0, [1.0, 1.0, 0.0, 1.0], &c, g, &mut glyphs);
+                        }
                         // 绘制暂停指示器
-                        menu.draw_pause_indicator(&c, g);
+                        menu.draw_pause_indicator(&c, g, &mut glyphs);
+                        // 绘制操作帮助（在游戏区域外）
+                        menu.draw_controls_help(&c, g, &mut glyphs);
                     }
-                    menu.draw(&c, g); // 绘制游戏内菜单按钮
+                    menu.draw(&c, g, &mut glyphs); // 绘制游戏内菜单按钮
                 }
                 MenuState::GameMenu => {
                     if let Some(ref game) = game {
                         game.draw(&c, g);
                     }
-                    menu.draw(&c, g); // 绘制游戏内菜单
+                    menu.draw(&c, g, &mut glyphs); // 绘制游戏内菜单
                 }
                 MenuState::GameOver => {
                     if let Some(ref game) = game {
                         game.draw(&c, g);
                     }
-                    menu.draw(&c, g); // 绘制GameOver菜单
+                    menu.draw(&c, g, &mut glyphs); // 绘制GameOver菜单
                 }
             }
+            // 刷新字体缓冲，避免只绘制首字符的问题
+            glyphs.factory.encoder.flush(device);
         });
         
         event.update(|arg| {

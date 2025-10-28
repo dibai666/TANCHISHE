@@ -54,10 +54,20 @@ impl Menu {
     }
 
     pub fn load_font(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        let font_path = Path::new("assets/FiraSans-Regular.ttf");
-        let font_data = std::fs::read(font_path)?;
-        self.font = Some(rusttype::Font::try_from_vec(font_data).ok_or("Failed to load font")?);
-        Ok(())
+        // 依次尝试从项目根目录与 assets 目录加载字体
+        let candidates = [
+            Path::new("FiraSans-Regular.ttf"),
+            Path::new("assets/FiraSans-Regular.ttf"),
+        ];
+        for path in candidates.iter() {
+            if let Ok(font_data) = std::fs::read(path) {
+                if let Some(font) = rusttype::Font::try_from_vec(font_data) {
+                    self.font = Some(font);
+                    return Ok(());
+                }
+            }
+        }
+        Err("Failed to load font from root or assets".into())
     }
 
     pub fn update_window_size(&mut self, new_width: f64, new_height: f64) {
@@ -264,28 +274,28 @@ impl Menu {
         }
     }
 
-    pub fn draw(&self, con: &Context, g: &mut G2d) {
+    pub fn draw(&self, con: &Context, g: &mut G2d, glyphs: &mut piston_window::Glyphs) {
         match self.state {
-            MenuState::Main => self.draw_main_menu(con, g),
-            MenuState::ModeSelection => self.draw_mode_selection(con, g),
-            MenuState::SpeedSelection => self.draw_speed_selection(con, g),
-            MenuState::ConfirmStart => self.draw_confirm_start(con, g),
+            MenuState::Main => self.draw_main_menu(con, g, glyphs),
+            MenuState::ModeSelection => self.draw_mode_selection(con, g, glyphs),
+            MenuState::SpeedSelection => self.draw_speed_selection(con, g, glyphs),
+            MenuState::ConfirmStart => self.draw_confirm_start(con, g, glyphs),
             MenuState::Playing => {
                 // 游戏进行中，绘制菜单按钮
                 self.draw_game_menu_button(con, g);
             }
             MenuState::GameMenu => {
                 // 绘制游戏内菜单
-                self.draw_game_menu(con, g);
+                self.draw_game_menu(con, g, glyphs);
             }
             MenuState::GameOver => {
                 // 绘制GameOver菜单
-                self.draw_game_over_menu(con, g);
+                self.draw_game_over_menu(con, g, glyphs);
             }
         }
     }
 
-    fn draw_main_menu(&self, con: &Context, g: &mut G2d) {
+    fn draw_main_menu(&self, con: &Context, g: &mut G2d, glyphs: &mut piston_window::Glyphs) {
         let center_x = self.window_width / 2.0;
         let center_y = self.window_height / 2.0;
 
@@ -297,19 +307,18 @@ impl Menu {
             g,
         );
 
-        // 绘制标题阴影
-        self.draw_text("SNAKE GAME", center_x + 2.0, center_y - 118.0, 48.0, [0.0, 0.0, 0.0, 0.8], con, g);
-        // 绘制标题
-        self.draw_text("SNAKE GAME", center_x, center_y - 120.0, 48.0, [1.0, 1.0, 1.0, 1.0], con, g);
+        // 绘制标题（使用字体）
+        self.draw_text_glyph("SNAKE GAME", center_x + 2.0, center_y - 118.0, 48, [0.0, 0.0, 0.0, 0.8], con, g, glyphs);
+        self.draw_text_glyph("SNAKE GAME", center_x, center_y - 120.0, 48, [1.0, 1.0, 1.0, 1.0], con, g, glyphs);
 
         // 绘制游戏开始按钮
-        self.draw_button("START GAME", center_x, center_y - 20.0, 200.0, 50.0, [0.2, 0.6, 0.2, 1.0], con, g);
+        self.draw_button_glyph("START GAME", center_x, center_y - 20.0, 200.0, 50.0, [0.2, 0.6, 0.2, 1.0], con, g, glyphs);
 
         // 绘制退出按钮
-        self.draw_button("EXIT GAME", center_x, center_y + 50.0, 200.0, 50.0, [0.6, 0.2, 0.2, 1.0], con, g);
+        self.draw_button_glyph("EXIT GAME", center_x, center_y + 50.0, 200.0, 50.0, [0.6, 0.2, 0.2, 1.0], con, g, glyphs);
     }
 
-    fn draw_mode_selection(&self, con: &Context, g: &mut G2d) {
+    fn draw_mode_selection(&self, con: &Context, g: &mut G2d, glyphs: &mut piston_window::Glyphs) {
         let center_x = self.window_width / 2.0;
         let center_y = self.window_height / 2.0;
 
@@ -321,20 +330,17 @@ impl Menu {
             g,
         );
 
-        // 绘制标题阴影
-        self.draw_text("SELECT MODE", center_x + 2.0, center_y - 118.0, 40.0, [0.0, 0.0, 0.0, 0.8], con, g);
-        // 绘制标题
-        self.draw_text("SELECT MODE", center_x, center_y - 120.0, 40.0, [1.0, 1.0, 1.0, 1.0], con, g);
+        self.draw_text_glyph("SELECT MODE", center_x + 2.0, center_y - 118.0, 40, [0.0, 0.0, 0.0, 0.8], con, g, glyphs);
+        self.draw_text_glyph("SELECT MODE", center_x, center_y - 120.0, 40, [1.0, 1.0, 1.0, 1.0], con, g, glyphs);
 
         // 绘制模式按钮
-        self.draw_button("CLASSIC", center_x, center_y - 40.0, 200.0, 50.0, [0.2, 0.4, 0.8, 1.0], con, g);
-        self.draw_button("SPEED", center_x, center_y + 20.0, 200.0, 50.0, [0.8, 0.4, 0.2, 1.0], con, g);
-        self.draw_button("SURVIVAL", center_x, center_y + 80.0, 200.0, 50.0, [0.8, 0.2, 0.8, 1.0], con, g);
-        // 返回按钮
-        self.draw_button("BACK", center_x, center_y + 140.0, 200.0, 50.0, [0.4, 0.4, 0.4, 1.0], con, g);
+        self.draw_button_glyph("CLASSIC", center_x, center_y - 40.0, 200.0, 50.0, [0.2, 0.4, 0.8, 1.0], con, g, glyphs);
+        self.draw_button_glyph("SPEED", center_x, center_y + 20.0, 200.0, 50.0, [0.8, 0.4, 0.2, 1.0], con, g, glyphs);
+        self.draw_button_glyph("SURVIVAL", center_x, center_y + 80.0, 200.0, 50.0, [0.8, 0.2, 0.8, 1.0], con, g, glyphs);
+        self.draw_button_glyph("BACK", center_x, center_y + 140.0, 200.0, 50.0, [0.4, 0.4, 0.4, 1.0], con, g, glyphs);
     }
 
-    fn draw_speed_selection(&self, con: &Context, g: &mut G2d) {
+    fn draw_speed_selection(&self, con: &Context, g: &mut G2d, glyphs: &mut piston_window::Glyphs) {
         let center_x = self.window_width / 2.0;
         let center_y = self.window_height / 2.0;
 
@@ -346,19 +352,19 @@ impl Menu {
             g,
         );
 
-        self.draw_text("SELECT SPEED", center_x, center_y - 80.0, 36.0, [1.0, 1.0, 1.0, 1.0], con, g);
+        self.draw_text_glyph("SELECT SPEED", center_x, center_y - 80.0, 36, [1.0, 1.0, 1.0, 1.0], con, g, glyphs);
 
         let slow_color = if self.selected_speed == GameSpeed::Slow { [0.2, 0.8, 0.2, 1.0] } else { [0.2, 0.6, 0.2, 1.0] };
         let medium_color = if self.selected_speed == GameSpeed::Medium { [0.2, 0.8, 0.2, 1.0] } else { [0.2, 0.6, 0.2, 1.0] };
         let fast_color = if self.selected_speed == GameSpeed::Fast { [0.2, 0.8, 0.2, 1.0] } else { [0.2, 0.6, 0.2, 1.0] };
-        self.draw_button("SLOW", center_x - 120.0, center_y, 120.0, 40.0, slow_color, con, g);
-        self.draw_button("MEDIUM", center_x, center_y, 120.0, 40.0, medium_color, con, g);
-        self.draw_button("FAST", center_x + 120.0, center_y, 120.0, 40.0, fast_color, con, g);
+        self.draw_button_glyph("SLOW", center_x - 120.0, center_y, 120.0, 40.0, slow_color, con, g, glyphs);
+        self.draw_button_glyph("MEDIUM", center_x, center_y, 120.0, 40.0, medium_color, con, g, glyphs);
+        self.draw_button_glyph("FAST", center_x + 120.0, center_y, 120.0, 40.0, fast_color, con, g, glyphs);
 
-        self.draw_button("BACK", center_x, center_y + 100.0, 200.0, 40.0, [0.4, 0.4, 0.4, 1.0], con, g);
+        self.draw_button_glyph("BACK", center_x, center_y + 100.0, 200.0, 40.0, [0.4, 0.4, 0.4, 1.0], con, g, glyphs);
     }
 
-    fn draw_confirm_start(&self, con: &Context, g: &mut G2d) {
+    fn draw_confirm_start(&self, con: &Context, g: &mut G2d, glyphs: &mut piston_window::Glyphs) {
         let center_x = self.window_width / 2.0;
         let center_y = self.window_height / 2.0;
 
@@ -378,16 +384,16 @@ impl Menu {
             g,
         );
 
-        self.draw_text("Start with:", center_x, center_y - 40.0, 24.0, [1.0, 1.0, 1.0, 1.0], con, g);
+        self.draw_text_glyph("Start with:", center_x, center_y - 40.0, 24, [1.0, 1.0, 1.0, 1.0], con, g, glyphs);
         let speed_text = match self.selected_speed {
             GameSpeed::Slow => "SLOW",
             GameSpeed::Medium => "MEDIUM",
             GameSpeed::Fast => "FAST",
         };
-        self.draw_text(speed_text, center_x, center_y - 10.0, 28.0, [1.0, 1.0, 0.0, 1.0], con, g);
+        self.draw_text_glyph(speed_text, center_x, center_y - 10.0, 28, [1.0, 1.0, 0.0, 1.0], con, g, glyphs);
 
-        self.draw_button("YES", center_x - 50.0, center_y + 40.0, 80.0, 40.0, [0.2, 0.8, 0.2, 1.0], con, g);
-        self.draw_button("NO", center_x + 50.0, center_y + 40.0, 80.0, 40.0, [0.8, 0.2, 0.2, 1.0], con, g);
+        self.draw_button_glyph("YES", center_x - 50.0, center_y + 40.0, 80.0, 40.0, [0.2, 0.8, 0.2, 1.0], con, g, glyphs);
+        self.draw_button_glyph("NO", center_x + 50.0, center_y + 40.0, 80.0, 40.0, [0.8, 0.2, 0.2, 1.0], con, g, glyphs);
     }
 
     fn draw_game_menu_button(&self, con: &Context, g: &mut G2d) {
@@ -458,12 +464,27 @@ impl Menu {
         );
     }
     
-    pub fn draw_score(&self, score: i32, con: &Context, g: &mut G2d) {
+    pub fn draw_score(&self, score: i32, con: &Context, g: &mut G2d, glyphs: &mut piston_window::Glyphs) {
         let score_text = format!("SCORE: {}", score);
-        self.draw_text(&score_text, 100.0, 30.0, 24.0, [1.0, 1.0, 1.0, 1.0], con, g);
+        self.draw_text_glyph(&score_text, 100.0, 30.0, 24, [1.0, 1.0, 1.0, 1.0], con, g, glyphs);
+    }
+
+    pub fn draw_text_top_right(&self, text: &str, size_px: f64, color: [f32; 4], con: &Context, g: &mut G2d, glyphs: &mut piston_window::Glyphs) {
+        use piston_window::character::CharacterCache;
+        let spx = size_px as u32;
+        let mut total_w = 0.0;
+        for ch in text.chars() {
+            if let Ok(g) = glyphs.character(spx, ch) { total_w += g.advance_width(); }
+        }
+        let margin_right = 20.0;
+        let x_right = self.window_width - margin_right;
+        // 通过中心绘制，计算文本中心点位置
+        let x_center = x_right - total_w / 2.0;
+        let y = 30.0;
+        self.draw_text_glyph(text, x_center, y, spx, color, con, g, glyphs);
     }
     
-    pub fn draw_pause_indicator(&self, con: &Context, g: &mut G2d) {
+    pub fn draw_pause_indicator(&self, con: &Context, g: &mut G2d, glyphs: &mut piston_window::Glyphs) {
         if self.is_paused {
             let center_x = self.window_width / 2.0;
             let center_y = self.window_height / 2.0;
@@ -477,12 +498,42 @@ impl Menu {
             );
             
             // 绘制暂停文本
-            self.draw_text("PAUSED", center_x, center_y, 48.0, [1.0, 1.0, 0.0, 1.0], con, g);
-            self.draw_text("Press ESC to resume", center_x, center_y + 50.0, 22.0, [0.8, 0.8, 0.8, 1.0], con, g);
+            self.draw_text_glyph("PAUSED", center_x, center_y, 48, [1.0, 1.0, 0.0, 1.0], con, g, glyphs);
+            self.draw_text_glyph("Press ESC to resume", center_x, center_y + 50.0, 22, [0.8, 0.8, 0.8, 1.0], con, g, glyphs);
         }
     }
 
-    fn draw_game_menu(&self, con: &Context, g: &mut G2d) {
+    pub fn draw_controls_help(&self, con: &Context, g: &mut G2d, glyphs: &mut piston_window::Glyphs) {
+        // 在游戏区域外（右侧边距）显示操作说明
+        let panel_w = 230.0;
+        let panel_h = 160.0;
+        let x = self.window_width - panel_w - 20.0;
+        let y = 60.0;
+
+        // 背景面板
+        rectangle(
+            [0.0, 0.0, 0.0, 0.35],
+            [x, y, panel_w, panel_h],
+            con.transform,
+            g,
+        );
+
+        // 标题与内容
+        self.draw_text_glyph("CONTROLS", x + panel_w / 2.0, y + 22.0, 22, [1.0, 1.0, 1.0, 1.0], con, g, glyphs);
+
+        let line1 = "Move: Arrow / WASD";
+        let line2 = "Menu: ESC or button";
+        let line3 = "Click: UI buttons";
+        let mut ty = y + 52.0;
+        let lh = 20.0;
+        self.draw_text_glyph(line1, x + panel_w / 2.0, ty, 18, [0.9, 0.9, 0.9, 1.0], con, g, glyphs);
+        ty += lh;
+        self.draw_text_glyph(line2, x + panel_w / 2.0, ty, 18, [0.9, 0.9, 0.9, 1.0], con, g, glyphs);
+        ty += lh;
+        self.draw_text_glyph(line3, x + panel_w / 2.0, ty, 18, [0.9, 0.9, 0.9, 1.0], con, g, glyphs);
+    }
+
+    fn draw_game_menu(&self, con: &Context, g: &mut G2d, glyphs: &mut piston_window::Glyphs) {
         let center_x = self.window_width / 2.0;
         let center_y = self.window_height / 2.0;
 
@@ -530,18 +581,18 @@ impl Menu {
         );
 
         // 绘制菜单标题
-        self.draw_text("GAME MENU", center_x, center_y - 80.0, 32.0, [1.0, 1.0, 1.0, 1.0], con, g);
+        self.draw_text_glyph("GAME MENU", center_x, center_y - 80.0, 32, [1.0, 1.0, 1.0, 1.0], con, g, glyphs);
 
         // 绘制菜单按钮
         let pause_text = if self.is_paused { "RESUME" } else { "PAUSE" };
         let pause_color = if self.is_paused { [0.2, 0.8, 0.2, 1.0] } else { [0.8, 0.6, 0.2, 1.0] };
-        self.draw_button(pause_text, center_x, center_y - 30.0, 200.0, 40.0, pause_color, con, g);
-        self.draw_button("RESTART", center_x, center_y + 20.0, 200.0, 40.0, [0.6, 0.4, 0.2, 1.0], con, g);
-        self.draw_button("MAIN MENU", center_x, center_y + 70.0, 200.0, 40.0, [0.6, 0.2, 0.2, 1.0], con, g);
-        self.draw_button("CLOSE", center_x, center_y + 120.0, 200.0, 40.0, [0.4, 0.4, 0.4, 1.0], con, g);
+        self.draw_button_glyph(pause_text, center_x, center_y - 30.0, 200.0, 40.0, pause_color, con, g, glyphs);
+        self.draw_button_glyph("RESTART", center_x, center_y + 20.0, 200.0, 40.0, [0.6, 0.4, 0.2, 1.0], con, g, glyphs);
+        self.draw_button_glyph("MAIN MENU", center_x, center_y + 70.0, 200.0, 40.0, [0.6, 0.2, 0.2, 1.0], con, g, glyphs);
+        self.draw_button_glyph("CLOSE", center_x, center_y + 120.0, 200.0, 40.0, [0.4, 0.4, 0.4, 1.0], con, g, glyphs);
     }
 
-    fn draw_game_over_menu(&self, con: &Context, g: &mut G2d) {
+    fn draw_game_over_menu(&self, con: &Context, g: &mut G2d, glyphs: &mut piston_window::Glyphs) {
         let center_x = self.window_width / 2.0;
         let center_y = self.window_height / 2.0;
 
@@ -588,21 +639,20 @@ impl Menu {
             g,
         );
 
-        // 绘制GameOver标题阴影
-        self.draw_text("GAME OVER", center_x + 2.0, center_y - 58.0, 36.0, [0.0, 0.0, 0.0, 0.8], con, g);
         // 绘制GameOver标题
-        self.draw_text("GAME OVER", center_x, center_y - 60.0, 36.0, [1.0, 0.0, 0.0, 1.0], con, g);
+        self.draw_text_glyph("GAME OVER", center_x + 2.0, center_y - 58.0, 36, [0.0, 0.0, 0.0, 0.8], con, g, glyphs);
+        self.draw_text_glyph("GAME OVER", center_x, center_y - 60.0, 36, [1.0, 0.0, 0.0, 1.0], con, g, glyphs);
         
         // 绘制最终分数
         let score_text = format!("FINAL SCORE: {}", self.final_score);
-        self.draw_text(&score_text, center_x, center_y - 20.0, 24.0, [1.0, 1.0, 1.0, 1.0], con, g);
+        self.draw_text_glyph(&score_text, center_x, center_y - 20.0, 24, [1.0, 1.0, 1.0, 1.0], con, g, glyphs);
 
         // 绘制菜单按钮
-        self.draw_button("PLAY AGAIN", center_x, center_y + 20.0, 200.0, 40.0, [0.2, 0.8, 0.2, 1.0], con, g);
-        self.draw_button("MAIN MENU", center_x, center_y + 70.0, 200.0, 40.0, [0.6, 0.2, 0.2, 1.0], con, g);
+        self.draw_button_glyph("PLAY AGAIN", center_x, center_y + 20.0, 200.0, 40.0, [0.2, 0.8, 0.2, 1.0], con, g, glyphs);
+        self.draw_button_glyph("MAIN MENU", center_x, center_y + 70.0, 200.0, 40.0, [0.6, 0.2, 0.2, 1.0], con, g, glyphs);
     }
 
-    fn draw_button(&self, text: &str, x: f64, y: f64, width: f64, height: f64, color: [f32; 4], con: &Context, g: &mut G2d) {
+    fn draw_button_glyph(&self, text: &str, x: f64, y: f64, width: f64, height: f64, color: [f32; 4], con: &Context, g: &mut G2d, glyphs: &mut piston_window::Glyphs) {
         // 绘制按钮背景
         rectangle(
             color,
@@ -638,10 +688,18 @@ impl Menu {
             g,
         );
 
-        // 绘制按钮文字阴影（稍微偏移的深色文字）
-        self.draw_text(text, x + 1.0, y + 1.0, 22.0, [0.0, 0.0, 0.0, 0.8], con, g);
-        // 绘制按钮文字主体
-        self.draw_text(text, x, y, 22.0, [1.0, 1.0, 1.0, 1.0], con, g);
+        // 绘制按钮文字（使用字体）
+        self.draw_text_glyph(text, x + 1.0, y + 1.0, 22, [0.0, 0.0, 0.0, 0.8], con, g, glyphs);
+        self.draw_text_glyph(text, x, y, 22, [1.0, 1.0, 1.0, 1.0], con, g, glyphs);
+    }
+
+    fn draw_text_glyph(&self, text: &str, x: f64, y: f64, size_px: u32, color: [f32; 4], con: &Context, g: &mut G2d, glyphs: &mut piston_window::Glyphs) {
+        use piston_window::character::CharacterCache;
+        let total_w = glyphs.width(size_px, text).unwrap_or(0.0);
+        let baseline_adjust = (size_px as f64) * 0.35;
+        let transform = con.transform.trans(x - total_w / 2.0, y + baseline_adjust);
+        let txt = piston_window::Text::new_color(color, size_px);
+        let _ = txt.draw(text, glyphs, &con.draw_state, transform, g);
     }
 
     fn draw_text(&self, text: &str, x: f64, y: f64, size: f64, color: [f32; 4], con: &Context, g: &mut G2d) {
@@ -1018,5 +1076,20 @@ impl Menu {
                 }
             }
         }
+    }
+}
+
+// 增加供其他模块使用的简单文本显示
+pub fn draw_simple_text(text: &str, x: f64, y: f64, size: f64, color: [f32; 4], con: &Context, g: &mut G2d) {
+    // 用 menu 中自带的字体渲染
+    // 这里只调用 draw_english_text，即原 draw_text 的底层
+    let char_width = size * 0.6;
+    let char_height = size;
+    let start_x = x - (text.len() as f64 * char_width) / 2.0;
+    for (i, ch) in text.chars().enumerate() {
+        let char_x = start_x + i as f64 * char_width;
+        let char_y = y - char_height * 0.1;
+        Menu { state: crate::menu::MenuState::Main, selected_mode: crate::menu::GameMode::Classic, selected_speed: crate::menu::GameSpeed::Medium, font: None, window_width: 800.0, window_height: 600.0, is_paused: false, should_restart: false, final_score: 0 }
+            .draw_english_char(ch, char_x, char_y, char_width, char_height, color, con, g);
     }
 }

@@ -9,6 +9,8 @@ const BORDER_COLOR: Color = [0.80, 0.00, 0.00, 1.0];
 const GAMEOVER_COLOR: Color = [0.90, 0.00, 0.00, 0.5];
 const MOVING_PERIOD: f64 = 0.1;
 const RESTART_TIME: f64 = 1.0;
+const TIME_LIMIT_SECONDS: i32 = 30; // 初始30秒
+const TIME_ADD_PER_FOOD: i32 = 10;  // 每吃一个加10秒
 
 pub struct Game {
     snake: Snake,
@@ -28,6 +30,7 @@ pub struct Game {
     score: i32,
     speed_multiplier: f64,
     speed_setting: GameSpeed,
+    remaining_time: Option<f64>, // Survival模式剩余时间，秒
 }
 impl Game {
     pub fn new(width: i32, height: i32) -> Game {
@@ -42,7 +45,7 @@ impl Game {
             GameMode::Speed => 1.5,
             GameMode::Survival => 0.8,
         };
-        Game {
+        let mut g = Game {
             snake: Snake::new(2, 2),
             food_exists: true,
             food_x: 6,
@@ -60,7 +63,14 @@ impl Game {
             score: 0,
             speed_multiplier,
             speed_setting: speed,
+            remaining_time: None,
+        };
+        if mode == GameMode::Survival {
+            g.remaining_time = Some(TIME_LIMIT_SECONDS as f64);
+            g.speed_setting = GameSpeed::Fast; // 限时模式速度始终最快
+            g.speed_multiplier = 1.5; // 彻底快
         }
+        g
     }
     
     pub fn update_window_size(&mut self, new_width: f64, new_height: f64) {
@@ -94,10 +104,14 @@ impl Game {
             Key::D => Some(Direction::Right),
             _ => None,
         };
-        if dir.unwrap() == self.snake.head_direction().opposite() {
-            return;
+        if let Some(d) = dir {
+            if d == self.snake.head_direction().opposite() {
+                return;
+            }
+            self.update_snake(Some(d));
+        } else {
+            // 非方向键：忽略
         }
-        self.update_snake(dir);
     }
     pub fn draw(&self, con: &Context, g: &mut G2d) {
         self.snake.draw_dynamic_with_offset(con, g, self.block_size, self.offset_x, self.offset_y);
@@ -111,9 +125,32 @@ impl Game {
         if self.game_over {
             draw_rectangle_dynamic_with_offset(GAMEOVER_COLOR, 0, 0, self.width, self.height, self.block_size, self.offset_x, self.offset_y, con, g);
         }
+        // 限时模式右上角时间
+        if self.game_mode == GameMode::Survival {
+            if let Some(sec) = self.remaining_time {
+                let min = (sec as i32) / 60;
+                let s = (sec as i32) % 60;
+                let time_str = format!("TIME {:02}:{:02}", min, s);
+                // 右上角
+                let txt_x = self.window_width - 160.0;
+                let txt_y = 40.0;
+                crate::menu::draw_simple_text(&time_str, txt_x, txt_y, 28.0, [1.0, 1.0, 0.0, 1.0], con, g);
+            }
+        }
     }
     pub fn update(&mut self, delta_time: f64) {
         self.waiting_time += delta_time;
+        if self.game_mode == GameMode::Survival {
+            if let Some(rt) = self.remaining_time.as_mut() {
+                *rt -= delta_time;
+                if *rt < 0.0 {
+                    *rt = 0.0;
+                }
+                if *rt <= 0.0 && !self.game_over {
+                    self.game_over = true;
+                }
+            }
+        }
         if self.game_over {
             if self.waiting_time > RESTART_TIME {
                 self.restart();
@@ -145,6 +182,11 @@ impl Game {
             // 在速度模式下，随着分数增加，速度也会增加
             if self.game_mode == GameMode::Speed {
                 self.speed_multiplier = 1.5 + (self.score as f64 * 0.1);
+            }
+            if self.game_mode == GameMode::Survival {
+                if let Some(rt) = self.remaining_time.as_mut() {
+                    *rt += TIME_ADD_PER_FOOD as f64;
+                }
             }
         }
     }
@@ -190,6 +232,11 @@ impl Game {
             GameMode::Speed => 1.5,
             GameMode::Survival => 0.8,
         };
+        self.remaining_time = if self.game_mode == GameMode::Survival {
+            Some(TIME_LIMIT_SECONDS as f64)
+        } else {
+            None
+        };
     }
     
     pub fn get_score(&self) -> i32 {
@@ -206,5 +253,8 @@ impl Game {
     
     pub fn set_game_over(&mut self) {
         self.game_over = true;
+    }
+    pub fn get_remaining_time(&self) -> Option<f64> {
+        self.remaining_time
     }
 }
