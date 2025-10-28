@@ -54,20 +54,13 @@ impl Menu {
     }
 
     pub fn load_font(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        // 依次尝试从项目根目录与 assets 目录加载字体
-        let candidates = [
-            Path::new("FiraSans-Regular.ttf"),
-            Path::new("assets/FiraSans-Regular.ttf"),
-        ];
-        for path in candidates.iter() {
-            if let Ok(font_data) = std::fs::read(path) {
-                if let Some(font) = rusttype::Font::try_from_vec(font_data) {
-                    self.font = Some(font);
-                    return Ok(());
-                }
-            }
+        // 使用编译期内嵌字体，避免发布版找不到路径
+        let font_bytes: &'static [u8] = include_bytes!("../assets/FiraSans-Regular.ttf");
+        if let Some(font) = rusttype::Font::try_from_vec(font_bytes.to_vec()) {
+            self.font = Some(font);
+            return Ok(());
         }
-        Err("Failed to load font from root or assets".into())
+        Err("Failed to load embedded font".into())
     }
 
     pub fn update_window_size(&mut self, new_width: f64, new_height: f64) {

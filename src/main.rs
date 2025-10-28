@@ -23,12 +23,13 @@ fn main() {
             .unwrap();
     
     let mut menu = Menu::new(800.0, 600.0);
-    // 加载字体：优先根目录，其次 assets/
-    let mut glyphs = if std::path::Path::new("FiraSans-Regular.ttf").exists() {
-        Glyphs::new("FiraSans-Regular.ttf", window.create_texture_context(), TextureSettings::new()).unwrap()
-    } else {
-        Glyphs::new("assets/FiraSans-Regular.ttf", window.create_texture_context(), TextureSettings::new()).unwrap()
-    };
+    // 加载字体：使用编译期内嵌，发布版无需依赖外部路径
+    let font_bytes: &'static [u8] = include_bytes!("../assets/FiraSans-Regular.ttf");
+    let mut glyphs = Glyphs::from_bytes(
+        font_bytes,
+        window.create_texture_context(),
+        TextureSettings::new(),
+    ).unwrap();
     let mut game: Option<Game> = None;
     let mut cursor_pos = [0.0, 0.0];
     
