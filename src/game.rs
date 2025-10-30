@@ -5,18 +5,41 @@ use rand::{thread_rng, Rng};
 use crate::snake::{Direction, Snake};
 use crate::menu::{GameMode, GameSpeed};
 const FOOD_COLOR: Color = [0.80, 0.00, 0.00, 1.0];
+const BIG_FOOD_COLOR: Color = [1.0, 0.5, 0.0, 1.0]; // 黄色的大食物
 const BORDER_COLOR: Color = [0.80, 0.00, 0.00, 1.0];
 const GAMEOVER_COLOR: Color = [0.90, 0.00, 0.00, 0.5];
 const MOVING_PERIOD: f64 = 0.1;
 const RESTART_TIME: f64 = 1.0;
 const TIME_LIMIT_SECONDS: i32 = 30; // 初始30秒
 const TIME_ADD_PER_FOOD: i32 = 10;  // 每吃一个加10秒
+const BIG_FOOD_SPAWN_INTERVAL: f64 = 8.0; // 大食物出现倒计时
+const BIG_FOOD_LIFETIME: f64 = 5.0; //大食物消失倒计时
+const MESSAGE_DISPLAY_TIME: f64 = 5.0; // 信息显示时间
+
+struct GameMessage {
+    text: String,
+    lifetime: f64,
+}
+
+impl GameMessage {
+    fn new(text: String) -> Self {
+        Self {
+            text,
+            lifetime: MESSAGE_DISPLAY_TIME,
+        }
+    }
+}
 
 pub struct Game {
     snake: Snake,
     food_exists: bool,
     food_x: i32,
     food_y: i32,
+    big_food_exists: bool,
+    big_food_x: i32,
+    big_food_y: i32,
+    big_food_timer: f64, // 大食物生成计时器
+    big_food_lifetime: f64, // 当前大食物的存活时间
     width: i32,
     height: i32,
     game_over: bool,
@@ -31,6 +54,7 @@ pub struct Game {
     speed_multiplier: f64,
     speed_setting: GameSpeed,
     remaining_time: Option<f64>, // Survival模式剩余时间，秒
+    messages: Vec<GameMessage>, // 在右侧显示的消息
 }
 impl Game {
     pub fn new(width: i32, height: i32) -> Game {
@@ -38,7 +62,7 @@ impl Game {
     }
     
     pub fn new_with_mode(width: i32, height: i32, mode: GameMode, speed: GameSpeed) -> Game {
-        let initial_window_width = (width * 25) as f64; // 25 is BLOCK_SIZE
+        let initial_window_width = (width * 25) as f64; // 25是区块大小
         let initial_window_height = (height * 25) as f64;
         let speed_multiplier = match mode {
             GameMode::Classic => 1.0,
@@ -50,6 +74,11 @@ impl Game {
             food_exists: true,
             food_x: 6,
             food_y: 4,
+            big_food_exists: false,
+            big_food_x: 0,
+            big_food_y: 0,
+            big_food_timer: 0.0,
+            big_food_lifetime: 0.0,
             width,
             height,
             game_over: false,
@@ -64,6 +93,7 @@ impl Game {
             speed_multiplier,
             speed_setting: speed,
             remaining_time: None,
+            messages: Vec::new(),
         };
         if mode == GameMode::Survival {
             g.remaining_time = Some(TIME_LIMIT_SECONDS as f64);
@@ -118,6 +148,14 @@ impl Game {
         if self.food_exists {
             draw_block_dynamic_with_offset(FOOD_COLOR, self.food_x, self.food_y, self.block_size, self.offset_x, self.offset_y, con, g);
         }
+        // 绘制大食物（更大的 - 2x2方块）
+        if self.big_food_exists {
+            for dx in 0..2 {
+                for dy in 0..2 {
+                    draw_block_dynamic_with_offset(BIG_FOOD_COLOR, self.big_food_x + dx, self.big_food_y + dy, self.block_size, self.offset_x, self.offset_y, con, g);
+                }
+            }
+        }
         draw_rectangle_dynamic_with_offset(BORDER_COLOR, 0, 0, self.width, 1, self.block_size, self.offset_x, self.offset_y, con, g);
         draw_rectangle_dynamic_with_offset(BORDER_COLOR, 0, self.height - 1, self.width, 1, self.block_size, self.offset_x, self.offset_y, con, g);
         draw_rectangle_dynamic_with_offset(BORDER_COLOR, 0, 0, 1, self.height, self.block_size, self.offset_x, self.offset_y, con, g);
@@ -161,6 +199,31 @@ impl Game {
             self.add_food();
         }
         
+        // 处理大食物计时
+        self.big_food_timer += delta_time;
+        
+        // 每8秒生成大食物
+        if !self.big_food_exists && self.big_food_timer >= BIG_FOOD_SPAWN_INTERVAL {
+            self.add_big_food();
+            self.big_food_timer = 0.0;
+            self.big_food_lifetime = 0.0;
+        }
+        
+        // 更新大食物存活时间
+        if self.big_food_exists {
+            self.big_food_lifetime += delta_time;
+            // 5秒后移除大食物
+            if self.big_food_lifetime >= BIG_FOOD_LIFETIME {
+                self.big_food_exists = false;
+            }
+        }
+        
+        // 更新消息存活时间
+        for msg in &mut self.messages {
+            msg.lifetime -= delta_time;
+        }
+        self.messages.retain(|msg| msg.lifetime > 0.0);
+        
         // 根据游戏模式与选择的速度调整移动速度
         let speed_setting_multiplier = match self.speed_setting {
             GameSpeed::Slow => 0.7,    // 慢速
@@ -178,6 +241,7 @@ impl Game {
             self.food_exists = false;
             self.snake.restore_tail();
             self.score += 1;
+            self.add_message(format!("+1 Point"));
             
             // 在速度模式下，随着分数增加，速度也会增加
             if self.game_mode == GameMode::Speed {
@@ -186,6 +250,34 @@ impl Game {
             if self.game_mode == GameMode::Survival {
                 if let Some(rt) = self.remaining_time.as_mut() {
                     *rt += TIME_ADD_PER_FOOD as f64;
+                    self.add_message(format!("+{} Seconds", TIME_ADD_PER_FOOD));
+                }
+            }
+        }
+        
+        // 检查蛇是否吃到大食物（头部接触到2x2大食物的任意部分）
+        if self.big_food_exists {
+            let in_big_food_x = head_x >= self.big_food_x && head_x < self.big_food_x + 2;
+            let in_big_food_y = head_y >= self.big_food_y && head_y < self.big_food_y + 2;
+            if in_big_food_x && in_big_food_y {
+                self.big_food_exists = false;
+                // 大食物加3分
+                for _ in 0..3 {
+                    self.snake.restore_tail();
+                }
+                self.score += 3;
+                self.add_message(format!("Big Food +3 Points!"));
+                
+                // 在速度模式下，随着分数增加，速度也会增加
+                if self.game_mode == GameMode::Speed {
+                    self.speed_multiplier = 1.5 + (self.score as f64 * 0.1);
+                }
+                if self.game_mode == GameMode::Survival {
+                    if let Some(rt) = self.remaining_time.as_mut() {
+                        let time_bonus = TIME_ADD_PER_FOOD * 3;
+                        *rt += time_bonus as f64;
+                        self.add_message(format!("+{} Seconds", time_bonus));
+                    }
                 }
             }
         }
@@ -209,6 +301,40 @@ impl Game {
         self.food_y = new_y;
         self.food_exists = true;
     }
+    
+    fn add_big_food(&mut self) {
+        let mut rng = thread_rng();
+        let mut new_x = rng.gen_range(1, self.width - 2); // -2 确保2x2大小能放得下
+        let mut new_y = rng.gen_range(1, self.height - 2);
+        
+        // 检查2x2区域是否与蛇重叠
+        let mut valid_position = false;
+        let mut attempts = 0;
+        while !valid_position && attempts < 100 {
+            valid_position = true;
+            // 检查2x2区域的所有4个方块
+            for dx in 0..2 {
+                for dy in 0..2 {
+                    if self.snake.overlap_tail(new_x + dx, new_y + dy) {
+                        valid_position = false;
+                        break;
+                    }
+                }
+                if !valid_position {
+                    break;
+                }
+            }
+            if !valid_position {
+                new_x = rng.gen_range(1, self.width - 2);
+                new_y = rng.gen_range(1, self.height - 2);
+                attempts += 1;
+            }
+        }
+        
+        self.big_food_x = new_x;
+        self.big_food_y = new_y;
+        self.big_food_exists = true;
+    }
     fn update_snake(&mut self, dir: Option<Direction>) {
         if self.check_if_snake_alive(dir) {
             self.snake.move_forward(dir);
@@ -224,6 +350,11 @@ impl Game {
         self.food_exists = true;
         self.food_x = 6;
         self.food_y = 4;
+        self.big_food_exists = false;
+        self.big_food_x = 0;
+        self.big_food_y = 0;
+        self.big_food_timer = 0.0;
+        self.big_food_lifetime = 0.0;
         self.game_over = false;
         self.score = 0;
         // 重置速度倍数
@@ -256,5 +387,60 @@ impl Game {
     }
     pub fn get_remaining_time(&self) -> Option<f64> {
         self.remaining_time
+    }
+    
+    fn add_message(&mut self, text: String) {
+        self.messages.push(GameMessage::new(text));
+    }
+    
+    pub fn draw_messages(&self, con: &Context, g: &mut G2d, glyphs: &mut piston_window::Glyphs) {
+        // 在游戏区域右侧绘制消息
+        let start_x = self.offset_x + (self.width as f64 * self.block_size) + 20.0;
+        let start_y = 100.0; // 从分数下方开始
+        let line_height = 30.0;
+        
+        for (i, msg) in self.messages.iter().enumerate() {
+            // 根据剩余存活时间计算透明度（最后0.5秒淡出）
+            let fade_start = 0.5;
+            let alpha = if msg.lifetime > fade_start {
+                1.0
+            } else {
+                (msg.lifetime / fade_start).max(0.0)
+            };
+            
+            let y = start_y + (i as f64 * line_height);
+            let color = if msg.text.contains("Big Food") {
+                // 大食物消息使用橙色
+                [1.0f32, 0.6f32, 0.0f32, alpha as f32]
+            } else {
+                // 普通食物消息使用绿色
+                [0.2f32, 1.0f32, 0.2f32, alpha as f32]
+            };
+            
+            // 绘制背景矩形以提高可见性
+            let text_size = 20.0;
+            let bg_width = 200.0;
+            let bg_height = 28.0;
+            rectangle(
+                [0.0f32, 0.0f32, 0.0f32, (alpha * 0.5) as f32],
+                [start_x, y - bg_height / 2.0, bg_width, bg_height],
+                con.transform,
+                g,
+            );
+            
+            // 绘制消息文本
+            self.draw_text_with_alpha(&msg.text, start_x + bg_width / 2.0, y, text_size, color, con, g, glyphs);
+        }
+    }
+    
+    fn draw_text_with_alpha(&self, text: &str, x: f64, y: f64, size_px: f64, color: [f32; 4], con: &Context, g: &mut G2d, glyphs: &mut piston_window::Glyphs) {
+        use piston_window::character::CharacterCache;
+        
+        let spx = size_px as u32;
+        let total_w = glyphs.width(spx, text).unwrap_or(0.0);
+        let baseline_adjust = size_px * 0.35;
+        let transform = con.transform.trans(x - total_w / 2.0, y + baseline_adjust);
+        let txt = piston_window::Text::new_color(color, spx);
+        let _ = txt.draw(text, glyphs, &con.draw_state, transform, g);
     }
 }

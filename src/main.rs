@@ -21,9 +21,11 @@ fn main() {
             .resizable(true)
             .build()
             .unwrap();
+    // 注意：当前依赖版本不支持直接关闭 IME；如需避免编辑器“打字”，
+    // 请确保焦点在游戏窗口（单击游戏窗口或 Alt+Tab 切过去）。
     
     let mut menu = Menu::new(800.0, 600.0);
-    // 加载字体：使用编译期内嵌，发布版无需依赖外部路径
+    // 加载字体 
     let font_bytes: &'static [u8] = include_bytes!("../assets/FiraSans-Regular.ttf");
     let mut glyphs = Glyphs::from_bytes(
         font_bytes,
@@ -72,6 +74,23 @@ fn main() {
                 menu.handle_key(key);
             }
         }
+
+        // 兼容某些平台/输入法将字母键作为文本事件而非键盘事件投递的情况
+        if let Some(text) = event.text_args() {
+            if menu.state == MenuState::Playing {
+                if let Some(ref mut game) = game {
+                    for ch in text.chars() {
+                        match ch {
+                            'w' | 'W' => game.key_pressed(Key::W),
+                            'a' | 'A' => game.key_pressed(Key::A),
+                            's' | 'S' => game.key_pressed(Key::S),
+                            'd' | 'D' => game.key_pressed(Key::D),
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
         
         // 处理窗口大小变化
         if let Some(args) = event.resize_args() {
@@ -103,8 +122,8 @@ fn main() {
                         }
                         // 绘制暂停指示器
                         menu.draw_pause_indicator(&c, g, &mut glyphs);
-                        // 绘制操作帮助（在游戏区域外）
-                        menu.draw_controls_help(&c, g, &mut glyphs);
+                        // 绘制游戏消息
+                        game.draw_messages(&c, g, &mut glyphs);
                     }
                     menu.draw(&c, g, &mut glyphs); // 绘制游戏内菜单按钮
                 }
